@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="<%= pageTitle %> - Audit your website's readiness for AI optimization">
+    <meta name="keywords" content="AI optimization, website audit, SEO, structured data, AI readiness">
+    <title><%= pageTitle %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><%= appName %></h1>
+            <p><%= appDescription %></p>
+            <% if (typeof version !== 'undefined') { %>
+                <small style="opacity: 0.7;">v<%= version %></small>
+            <% } %>
+        </div>
+
+        <div class="audit-form">
+            <div id="apiStatus" class="api-status disconnected">
+                🔍 Checking backend connection...
+            </div>
+            <form id="auditForm" onsubmit="return false;">
+                <div class="form-group">
+                    <input 
+                        type="url" 
+                        class="url-input" 
+                        id="websiteUrl" 
+                        name="url"
+                        placeholder="Enter website URL (e.g., https://example.com)" 
+                        required
+                        value="<%= defaultUrl || '' %>"
+                    >
+                    <button type="button" class="audit-btn" id="auditBtn">
+                        <span id="btnText">Run Audit</span>
+                        <span id="btnSpinner" class="btn-spinner" style="display: none;">⏳</span>
+                    </button>
+                </div>
+                <% if (typeof showExamples !== 'undefined' && showExamples) { %>
+                <div class="example-urls">
+                    <p><strong>Try these examples:</strong></p>
+                    <div class="example-buttons">
+                        <button type="button" class="example-btn" data-url="https://github.com">GitHub</button>
+                        <button type="button" class="example-btn" data-url="https://stackoverflow.com">Stack Overflow</button>
+                        <button type="button" class="example-btn" data-url="https://wikipedia.org">Wikipedia</button>
+                    </div>
+                </div>
+                <% } %>
+            </form>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loadingText">Analyzing your website for AI optimization...</p>
+            <div class="loading-steps">
+                <div class="step" id="step1">📄 Fetching page content</div>
+                <div class="step" id="step2">🔍 Analyzing structure</div>
+                <div class="step" id="step3">🤖 Checking AI accessibility</div>
+                <div class="step" id="step4">📊 Generating recommendations</div>
+            </div>
+        </div>
+
+        <div class="results" id="results">
+            <div class="score-overview">
+                <div class="overall-score" id="overallScore">0</div>
+                <div class="score-label">Overall AIO Score</div>
+                <div class="score-description" id="scoreDescription"></div>
+            </div>
+
+            <div class="audit-sections" id="auditSections">
+                <!-- Audit sections will be populated here -->
+            </div>
+
+            <div class="recommendations" id="recommendations">
+                <h3>🎯 Priority Recommendations</h3>
+                <div id="recommendationsList">
+                    <!-- Recommendations will be populated here -->
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="action-btn secondary" id="exportBtn">📄 Export Report</button>
+                <button class="action-btn primary" id="newAuditBtn">🔄 Run New Audit</button>
+            </div>
+        </div>
+
+        <% if (typeof showFooter !== 'undefined' && showFooter) { %>
+        <footer class="footer">
+            <div class="footer-content">
+                <p>&copy; <%= new Date().getFullYear() %> <%= appName %>. Built for AI optimization.</p>
+                <div class="footer-links">
+                    <a href="/about">About</a>
+                    <a href="/api/docs">API Docs</a>
+                    <a href="/contact">Contact</a>
+                </div>
+            </div>
+        </footer>
+        <% } %>
+    </div>
+
+    <!-- Include JavaScript -->
+    <script src="/js/audit.js"></script>
+    <script>
+        // Template variables for JavaScript
+        window.APP_CONFIG = {
+            apiBaseUrl: '<%= apiBaseUrl || "http://localhost:3000" %>',
+            appName: '<%= appName %>',
+            version: '<%= version || "1.0.0" %>',
+            isDevelopment: '<%= isDevelopment || false %>'
+        };
+
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAuditApp();
+            
+            // Add event listeners for buttons
+            document.getElementById('auditBtn').addEventListener('click', startAudit);
+            document.getElementById('exportBtn').addEventListener('click', exportResults);
+            document.getElementById('newAuditBtn').addEventListener('click', runNewAudit);
+            
+            // Example URL buttons
+            document.querySelectorAll('.example-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    setExampleUrl(this.dataset.url);
+                });
+            });
+        });
+
+        function setExampleUrl(url) {
+            document.getElementById('websiteUrl').value = url;
+            document.getElementById('websiteUrl').focus();
+        }
+
+        function runNewAudit() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('websiteUrl').value = '';
+            document.getElementById('websiteUrl').focus();
+        }
+
+        function exportResults() {
+            if (!auditData) {
+                alert('No audit results to export');
+                return;
+            }
+
+            const reportData = {
+                ...auditData,
+                exportedAt: new Date().toISOString(),
+                exportedBy: window.APP_CONFIG.appName
+            };
+
+            const blob = new Blob([JSON.stringify(reportData, null, 2)], {
+                type: 'application/json'
+            });
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `aio-audit-${auditData.domain}-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
