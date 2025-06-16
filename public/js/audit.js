@@ -298,11 +298,21 @@ function generateMockAuditResults(url) {
 function displayAuditResults() {
     // Update overall score
     const overallScore = auditData.overallScore;
-    document.getElementById('overallScore').textContent = overallScore;
+    const scoreElement = document.getElementById('overallScore');
+    
+    if (overallScore === 'N/A' || auditData.limited) {
+        scoreElement.textContent = 'N/A';
+        scoreElement.style.fontSize = '2.5rem';
+    } else {
+        scoreElement.textContent = overallScore;
+        scoreElement.style.fontSize = '4rem';
+    }
     
     // Update score description
     const scoreDescription = document.getElementById('scoreDescription');
-    if (overallScore >= 90) {
+    if (auditData.limited) {
+        scoreDescription.textContent = '⚠️ Limited analysis - website access restricted';
+    } else if (overallScore >= 90) {
         scoreDescription.textContent = '🎉 Excellent AI optimization!';
     } else if (overallScore >= 80) {
         scoreDescription.textContent = '✅ Good AI readiness with room for improvement';
@@ -322,13 +332,26 @@ function displayAuditResults() {
         const sectionDiv = document.createElement('div');
         sectionDiv.className = 'audit-section';
         
-        const scoreClass = section.score >= 90 ? 'excellent' : 
-                         section.score >= 70 ? 'good' : 'needs-work';
+        let scoreClass = 'needs-work';
+        let scoreDisplay = section.score;
+        
+        if (section.score === 'N/A') {
+            scoreClass = 'unavailable';
+            scoreDisplay = 'N/A';
+        } else if (section.score >= 90) {
+            scoreClass = 'excellent';
+            scoreDisplay = section.score + '/100';
+        } else if (section.score >= 70) {
+            scoreClass = 'good';
+            scoreDisplay = section.score + '/100';
+        } else {
+            scoreDisplay = section.score + '/100';
+        }
         
         sectionDiv.innerHTML = `
             <div class="section-header">
                 <div class="section-title">${section.title}</div>
-                <div class="section-score ${scoreClass}">${section.score}/100</div>
+                <div class="section-score ${scoreClass}">${scoreDisplay}</div>
             </div>
             ${section.checks.map(check => `
                 <div class="check-item">
@@ -531,18 +554,37 @@ function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
+    
+    let backgroundColor;
+    switch(type) {
+        case 'success':
+            backgroundColor = '#28a745';
+            break;
+        case 'error':
+            backgroundColor = '#dc3545';
+            break;
+        case 'warning':
+            backgroundColor = '#ffc107';
+            notification.style.color = '#856404';
+            break;
+        default:
+            backgroundColor = '#17a2b8';
+    }
+    
     notification.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
-        background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
-        color: white;
+        background: ${backgroundColor};
+        color: ${type === 'warning' ? '#856404' : 'white'};
         padding: 1rem 1.5rem;
         border-radius: 10px;
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         z-index: 1000;
         transform: translateX(100%);
         transition: transform 0.3s ease;
+        max-width: 400px;
+        word-wrap: break-word;
     `;
     
     document.body.appendChild(notification);
@@ -556,9 +598,11 @@ function showNotification(message, type = 'info') {
     setTimeout(() => {
         notification.style.transform = 'translateX(100%)';
         setTimeout(() => {
-            document.body.removeChild(notification);
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
         }, 300);
-    }, 3000);
+    }, 5000);
 }
 
 // Reset form for new audit

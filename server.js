@@ -84,17 +84,32 @@ const rateLimit = (req, res, next) => {
     next();
 };
 
-// Helper function to fetch page content
+// Helper function to fetch page content with better error handling
 async function fetchPageContent(url, timeout = 10000) {
+    const userAgents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    ];
+    
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+    
     try {
         const response = await axios.get(url, {
             timeout,
             headers: {
-                'User-Agent': 'AIO-Audit-Bot/1.0 (Website AI Optimization Scanner)'
+                'User-Agent': randomUserAgent,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Cache-Control': 'max-age=0'
             },
             maxRedirects: 5,
             validateStatus: (status) => status < 400
         });
+        
         return {
             html: response.data,
             headers: response.headers,
@@ -102,7 +117,29 @@ async function fetchPageContent(url, timeout = 10000) {
             url: response.request.res.responseUrl || url
         };
     } catch (error) {
-        throw new Error(`Failed to fetch ${url}: ${error.message}`);
+        // Enhanced error handling with specific messages
+        if (error.response) {
+            const status = error.response.status;
+            if (status === 403) {
+                throw new Error(`Access denied (403): The website "${new URL(url).hostname}" is blocking automated requests. This is common for sites with bot protection.`);
+            } else if (status === 429) {
+                throw new Error(`Rate limited (429): The website "${new URL(url).hostname}" is limiting requests. Please try again later.`);
+            } else if (status === 404) {
+                throw new Error(`Page not found (404): The URL "${url}" does not exist.`);
+            } else if (status === 500) {
+                throw new Error(`Server error (500): The website "${new URL(url).hostname}" is experiencing technical difficulties.`);
+            } else {
+                throw new Error(`HTTP ${status}: Unable to fetch "${url}". Server returned status ${status}.`);
+            }
+        } else if (error.code === 'ENOTFOUND') {
+            throw new Error(`Domain not found: "${new URL(url).hostname}" could not be resolved. Please check the URL.`);
+        } else if (error.code === 'ECONNREFUSED') {
+            throw new Error(`Connection refused: Unable to connect to "${new URL(url).hostname}". The server may be down.`);
+        } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+            throw new Error(`Timeout: "${new URL(url).hostname}" took too long to respond. The server may be slow or overloaded.`);
+        } else {
+            throw new Error(`Network error: Failed to fetch "${url}". ${error.message}`);
+        }
     }
 }
 
@@ -629,7 +666,7 @@ app.get('/contact', (req, res) => {
     });
 });
 
-// Main audit endpoint
+// Main audit endpoint with better error handling
 app.post('/api/audit', rateLimit, async (req, res) => {
     try {
         const { url } = req.body;
@@ -637,14 +674,32 @@ app.post('/api/audit', rateLimit, async (req, res) => {
         // Validate URL
         if (!url || !validator.isURL(url)) {
             return res.status(400).json({
-                error: 'Invalid URL provided'
+                error: 'Invalid URL provided',
+                message: 'Please provide a valid URL starting with http:// or https://'
             });
         }
 
-        // Fetch page content
-        const pageData = await fetchPageContent(url);
+        let pageData;
+        let fetchError = null;
         
-        // Run all analyses
+        try {
+            // Try to fetch page content
+            pageData = await fetchPageContent(url);
+        } catch (error) {
+            fetchError = error;
+            console.error('Fetch error:', error.message);
+            
+            // For access denied or other fetch errors, return a partial audit
+            return res.status(200).json({
+                success: true,
+                audit: generateLimitedAudit(url, fetchError),
+                recommendations: generateFetchErrorRecommendations(fetchError),
+                warning: 'Limited analysis due to access restrictions',
+                error: error.message
+            });
+        }
+        
+        // Run all analyses if fetch was successful
         const [contentStructure, aiAccessibility, dataQuality, performance] = await Promise.all([
             analyzeContentStructure(pageData.html, url),
             analyzeAIAccessibility(url, pageData.html),
@@ -699,10 +754,126 @@ app.post('/api/audit', rateLimit, async (req, res) => {
         console.error('Audit error:', error);
         res.status(500).json({
             error: 'Failed to complete audit',
-            message: error.message
+            message: error.message,
+            suggestion: 'Please try again with a different URL or check if the website is accessible.'
         });
     }
 });
+
+// Generate limited audit for sites that block access
+function generateLimitedAudit(url, fetchError) {
+    const domain = urlParse(url).hostname;
+    const isHttps = url.startsWith('https://');
+    
+    return {
+        url: url,
+        domain: domain,
+        timestamp: new Date().toISOString(),
+        overallScore: 'N/A',
+        limited: true,
+        sections: {
+            contentStructure: {
+                title: 'Content Structure & Markup',
+                score: 'N/A',
+                checks: [
+                    {
+                        name: 'Content Access',
+                        status: 'fail',
+                        description: 'Unable to access website content for analysis'
+                    }
+                ]
+            },
+            aiAccessibility: {
+                title: 'AI Agent Accessibility',
+                score: fetchError.message.includes('403') ? 20 : 50,
+                checks: [
+                    {
+                        name: 'Bot Access',
+                        status: fetchError.message.includes('403') ? 'fail' : 'warning',
+                        description: fetchError.message.includes('403') 
+                            ? 'Website blocks automated access - AI agents may be restricted'
+                            : 'Access issues detected - may impact AI agent crawling'
+                    },
+                    {
+                        name: 'Domain Resolution',
+                        status: fetchError.message.includes('ENOTFOUND') ? 'fail' : 'pass',
+                        description: fetchError.message.includes('ENOTFOUND') 
+                            ? 'Domain cannot be resolved' 
+                            : 'Domain resolves correctly'
+                    }
+                ]
+            },
+            dataQuality: {
+                title: 'Data Quality & Format',
+                score: 'N/A',
+                checks: [
+                    {
+                        name: 'Content Analysis',
+                        status: 'fail',
+                        description: 'Cannot analyze content quality - access blocked'
+                    }
+                ]
+            },
+            performance: {
+                title: 'Performance & Speed',
+                score: isHttps ? 50 : 25,
+                checks: [
+                    {
+                        name: 'HTTPS Security',
+                        status: isHttps ? 'pass' : 'fail',
+                        description: isHttps 
+                            ? 'Website uses secure HTTPS protocol' 
+                            : 'Website does not use HTTPS - security risk'
+                    },
+                    {
+                        name: 'Accessibility',
+                        status: 'fail',
+                        description: 'Unable to test performance - access blocked'
+                    }
+                ]
+            }
+        }
+    };
+}
+
+// Generate recommendations for fetch errors
+function generateFetchErrorRecommendations(fetchError) {
+    const recommendations = [];
+    
+    if (fetchError.message.includes('403')) {
+        recommendations.push({
+            priority: 'high',
+            title: 'Remove Bot Blocking',
+            description: 'Your website is blocking automated access, which will prevent AI agents from crawling and indexing your content. Consider allowing legitimate bot access through robots.txt.',
+            impact: 'High - AI agents cannot access your content'
+        });
+        
+        recommendations.push({
+            priority: 'medium',
+            title: 'Implement Proper Bot Detection',
+            description: 'Instead of blocking all automated requests, implement proper bot detection that allows legitimate crawlers while blocking malicious bots.',
+            impact: 'Medium - Improves accessibility for beneficial AI agents'
+        });
+    }
+    
+    if (fetchError.message.includes('timeout') || fetchError.message.includes('ETIMEDOUT')) {
+        recommendations.push({
+            priority: 'high',
+            title: 'Improve Server Response Time',
+            description: 'Your website is taking too long to respond. Optimize server performance to ensure AI agents can crawl your content efficiently.',
+            impact: 'High - Slow responses hurt AI crawling efficiency'
+        });
+    }
+    
+    recommendations.push({
+        priority: 'low',
+        title: 'Test Website Accessibility',
+        description: 'Manually test your website to ensure it\'s accessible and functioning properly. Consider using tools like curl or wget to test automated access.',
+        impact: 'Low - General troubleshooting step'
+    });
+    
+    return recommendations;
+}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

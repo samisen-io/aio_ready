@@ -248,6 +248,7 @@ body {
 .section-score.excellent { background: #28a745; }
 .section-score.good { background: #ffc107; color: #333; }
 .section-score.needs-work { background: #dc3545; }
+.section-score.unavailable { background: #6c757d; color: white; }
 
 .check-item {
     display: flex;
