@@ -1,7 +1,7 @@
 // package.json dependencies needed:
 // npm install express cors helmet morgan compression dotenv ejs
 // npm install axios cheerio robots-parser lighthouse chrome-launcher
-// npm install validator url-parse path
+// npm install validator url-parse path puppeteer
 
 const express = require('express');
 const cors = require('cors');
@@ -562,6 +562,630 @@ async function analyzePerformance(url, headers, html) {
     return { checks, score: Math.min(score, 100) };
 }
 
+// Advanced Structured Data Analysis
+function analyzeStructuredData(html, url) {
+    const $ = cheerio.load(html);
+    const checks = [];
+    let score = 0;
+    let structuredDataCount = 0;
+    let schemaTypes = new Set();
+
+    // JSON-LD analysis
+    const jsonLdScripts = $('script[type="application/ld+json"]');
+    jsonLdScripts.each((i, el) => {
+        try {
+            const jsonData = JSON.parse($(el).html());
+            if (Array.isArray(jsonData)) {
+                jsonData.forEach(item => {
+                    if (item['@type']) {
+                        schemaTypes.add(item['@type']);
+                        structuredDataCount++;
+                    }
+                });
+            } else if (jsonData['@type']) {
+                schemaTypes.add(jsonData['@type']);
+                structuredDataCount++;
+            }
+        } catch (e) {
+            // Invalid JSON-LD
+        }
+    });
+
+    // Microdata analysis
+    const microdataItems = $('[itemscope]');
+    microdataItems.each((i, el) => {
+        const itemType = $(el).attr('itemtype');
+        if (itemType) {
+            const type = itemType.split('/').pop();
+            schemaTypes.add(type);
+            structuredDataCount++;
+        }
+    });
+
+    // Open Graph analysis
+    const openGraphTags = $('meta[property^="og:"]');
+    const hasOpenGraph = openGraphTags.length > 0;
+    const essentialOGTags = ['og:title', 'og:description', 'og:image', 'og:url'];
+    const foundOGTags = essentialOGTags.filter(tag => 
+        openGraphTags.filter((i, el) => $(el).attr('property') === tag).length > 0
+    );
+
+    // Twitter Card analysis
+    const twitterTags = $('meta[name^="twitter:"]');
+    const hasTwitterCards = twitterTags.length > 0;
+
+    // Scoring based on structured data implementation
+    if (structuredDataCount >= 3) {
+        checks.push({
+            name: 'Rich Structured Data',
+            status: 'pass',
+            description: `Found ${structuredDataCount} structured data items with types: ${Array.from(schemaTypes).join(', ')}`
+        });
+        score += 30;
+    } else if (structuredDataCount >= 1) {
+        checks.push({
+            name: 'Basic Structured Data',
+            status: 'warning',
+            description: `Found ${structuredDataCount} structured data items. Consider adding more schema types.`
+        });
+        score += 15;
+    } else {
+        checks.push({
+            name: 'No Structured Data',
+            status: 'fail',
+            description: 'No structured data found. This significantly impacts AI understanding.'
+        });
+    }
+
+    // Open Graph scoring
+    if (foundOGTags.length >= 3) {
+        checks.push({
+            name: 'Open Graph Optimization',
+            status: 'pass',
+            description: `Well-optimized Open Graph with ${foundOGTags.length}/4 essential tags`
+        });
+        score += 20;
+    } else if (hasOpenGraph) {
+        checks.push({
+            name: 'Open Graph Optimization',
+            status: 'warning',
+            description: `Basic Open Graph tags found but missing essential tags`
+        });
+        score += 10;
+    } else {
+        checks.push({
+            name: 'Open Graph Optimization',
+            status: 'fail',
+            description: 'No Open Graph tags found - impacts social media sharing'
+        });
+    }
+
+    // Twitter Cards scoring
+    if (hasTwitterCards) {
+        checks.push({
+            name: 'Twitter Card Optimization',
+            status: 'pass',
+            description: 'Twitter Card meta tags present for better social sharing'
+        });
+        score += 15;
+    } else {
+        checks.push({
+            name: 'Twitter Card Optimization',
+            status: 'warning',
+            description: 'No Twitter Card tags found - consider adding for better social media presence'
+        });
+        score += 5;
+    }
+
+    // Schema.org specific checks
+    const importantSchemas = ['Organization', 'WebSite', 'Article', 'Product', 'LocalBusiness'];
+    const foundImportantSchemas = importantSchemas.filter(schema => 
+        Array.from(schemaTypes).some(type => type.includes(schema))
+    );
+
+    if (foundImportantSchemas.length >= 2) {
+        checks.push({
+            name: 'Schema.org Implementation',
+            status: 'pass',
+            description: `Found important schemas: ${foundImportantSchemas.join(', ')}`
+        });
+        score += 20;
+    } else if (foundImportantSchemas.length >= 1) {
+        checks.push({
+            name: 'Schema.org Implementation',
+            status: 'warning',
+            description: `Found ${foundImportantSchemas.length} important schema(s). Consider adding more.`
+        });
+        score += 10;
+    } else {
+        checks.push({
+            name: 'Schema.org Implementation',
+            status: 'fail',
+            description: 'No important Schema.org types found. Add Organization and WebSite schemas.'
+        });
+    }
+
+    return { checks, score: Math.min(score, 100) };
+}
+
+// Social Media and Sharing Analysis
+function analyzeSocialMedia(html, url) {
+    const $ = cheerio.load(html);
+    const checks = [];
+    let score = 0;
+
+    // Social media links detection
+    const socialPlatforms = {
+        'facebook.com': 'Facebook',
+        'twitter.com': 'Twitter',
+        'linkedin.com': 'LinkedIn',
+        'instagram.com': 'Instagram',
+        'youtube.com': 'YouTube',
+        'github.com': 'GitHub'
+    };
+
+    const socialLinks = [];
+    $('a[href*="facebook.com"], a[href*="twitter.com"], a[href*="linkedin.com"], a[href*="instagram.com"], a[href*="youtube.com"], a[href*="github.com"]').each((i, el) => {
+        const href = $(el).attr('href');
+        for (const [domain, platform] of Object.entries(socialPlatforms)) {
+            if (href.includes(domain)) {
+                socialLinks.push(platform);
+                break;
+            }
+        }
+    });
+
+    if (socialLinks.length >= 3) {
+        checks.push({
+            name: 'Social Media Presence',
+            status: 'pass',
+            description: `Strong social media presence with links to: ${socialLinks.join(', ')}`
+        });
+        score += 25;
+    } else if (socialLinks.length >= 1) {
+        checks.push({
+            name: 'Social Media Presence',
+            status: 'warning',
+            description: `Limited social media presence: ${socialLinks.join(', ')}`
+        });
+        score += 15;
+    } else {
+        checks.push({
+            name: 'Social Media Presence',
+            status: 'fail',
+            description: 'No social media links found - consider adding social profiles'
+        });
+    }
+
+    // Social sharing buttons
+    const sharingButtons = $('a[href*="share"], a[href*="tweet"], .share, .social-share, [class*="share"]');
+    if (sharingButtons.length > 0) {
+        checks.push({
+            name: 'Social Sharing',
+            status: 'pass',
+            description: 'Social sharing functionality detected'
+        });
+        score += 25;
+    } else {
+        checks.push({
+            name: 'Social Sharing',
+            status: 'warning',
+            description: 'No social sharing buttons found - consider adding share functionality'
+        });
+        score += 10;
+    }
+
+    // RSS feed detection
+    const rssLinks = $('link[type="application/rss+xml"], link[type="application/atom+xml"]');
+    if (rssLinks.length > 0) {
+        checks.push({
+            name: 'RSS/Atom Feeds',
+            status: 'pass',
+            description: 'RSS/Atom feeds available for content syndication'
+        });
+        score += 25;
+    } else {
+        checks.push({
+            name: 'RSS/Atom Feeds',
+            status: 'warning',
+            description: 'No RSS/Atom feeds found - consider adding for content distribution'
+        });
+        score += 10;
+    }
+
+    // Email sharing
+    const emailLinks = $('a[href^="mailto:"]');
+    if (emailLinks.length > 0) {
+        checks.push({
+            name: 'Email Sharing',
+            status: 'pass',
+            description: 'Email sharing functionality available'
+        });
+        score += 25;
+    } else {
+        checks.push({
+            name: 'Email Sharing',
+            status: 'warning',
+            description: 'No email sharing links found'
+        });
+        score += 10;
+    }
+
+    return { checks, score: Math.min(score, 100) };
+}
+
+// Accessibility Analysis
+function analyzeAccessibility(html, url) {
+    const $ = cheerio.load(html);
+    const checks = [];
+    let score = 0;
+
+    // ARIA labels and roles
+    const ariaElements = $('[aria-label], [aria-labelledby], [role]');
+    const hasAriaLabels = $('[aria-label]').length > 0;
+    const hasRoles = $('[role]').length > 0;
+
+    if (ariaElements.length >= 5) {
+        checks.push({
+            name: 'ARIA Implementation',
+            status: 'pass',
+            description: `Good ARIA implementation with ${ariaElements.length} ARIA attributes`
+        });
+        score += 25;
+    } else if (ariaElements.length >= 1) {
+        checks.push({
+            name: 'ARIA Implementation',
+            status: 'warning',
+            description: `Basic ARIA implementation with ${ariaElements.length} attributes`
+        });
+        score += 15;
+    } else {
+        checks.push({
+            name: 'ARIA Implementation',
+            status: 'fail',
+            description: 'No ARIA attributes found - important for accessibility'
+        });
+    }
+
+    // Form accessibility
+    const forms = $('form');
+    const formsWithLabels = forms.filter((i, form) => {
+        const inputs = $(form).find('input, select, textarea');
+        return inputs.length === 0 || inputs.filter((j, input) => {
+            const id = $(input).attr('id');
+            return id && $(`label[for="${id}"]`).length > 0;
+        }).length === inputs.length;
+    });
+
+    if (forms.length === 0) {
+        checks.push({
+            name: 'Form Accessibility',
+            status: 'pass',
+            description: 'No forms found to test'
+        });
+        score += 25;
+    } else if (formsWithLabels.length === forms.length) {
+        checks.push({
+            name: 'Form Accessibility',
+            status: 'pass',
+            description: 'All forms have proper label associations'
+        });
+        score += 25;
+    } else {
+        checks.push({
+            name: 'Form Accessibility',
+            status: 'warning',
+            description: `${formsWithLabels.length}/${forms.length} forms have proper labels`
+        });
+        score += 15;
+    }
+
+    // Color contrast and semantic markup
+    const semanticElements = $('header, nav, main, article, section, aside, footer, h1, h2, h3, h4, h5, h6');
+    if (semanticElements.length >= 8) {
+        checks.push({
+            name: 'Semantic Markup',
+            status: 'pass',
+            description: `Good semantic structure with ${semanticElements.length} semantic elements`
+        });
+        score += 25;
+    } else if (semanticElements.length >= 4) {
+        checks.push({
+            name: 'Semantic Markup',
+            status: 'warning',
+            description: `Basic semantic structure with ${semanticElements.length} elements`
+        });
+        score += 15;
+    } else {
+        checks.push({
+            name: 'Semantic Markup',
+            status: 'fail',
+            description: 'Limited semantic markup - important for screen readers'
+        });
+    }
+
+    // Skip links and navigation
+    const skipLinks = $('a[href^="#"], a[href*="skip"], a[href*="nav"]');
+    const hasMainNavigation = $('nav').length > 0;
+    
+    if (hasMainNavigation && skipLinks.length > 0) {
+        checks.push({
+            name: 'Navigation Accessibility',
+            status: 'pass',
+            description: 'Good navigation structure with skip links'
+        });
+        score += 25;
+    } else if (hasMainNavigation) {
+        checks.push({
+            name: 'Navigation Accessibility',
+            status: 'warning',
+            description: 'Has navigation but could benefit from skip links'
+        });
+        score += 15;
+    } else {
+        checks.push({
+            name: 'Navigation Accessibility',
+            status: 'fail',
+            description: 'No clear navigation structure found'
+        });
+    }
+
+    return { checks, score: Math.min(score, 100) };
+}
+
+// Security Analysis
+function analyzeSecurity(html, url, headers) {
+    const checks = [];
+    let score = 0;
+
+    // HTTPS check (already in performance, but important for security)
+    if (url.startsWith('https://')) {
+        checks.push({
+            name: 'HTTPS Implementation',
+            status: 'pass',
+            description: 'Website uses secure HTTPS protocol'
+        });
+        score += 25;
+    } else {
+        checks.push({
+            name: 'HTTPS Implementation',
+            status: 'fail',
+            description: 'Website does not use HTTPS - major security risk'
+        });
+    }
+
+    // Security headers
+    const securityHeaders = {
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+        'Strict-Transport-Security': 'max-age=31536000',
+        'Content-Security-Policy': 'default-src \'self\''
+    };
+
+    let foundHeaders = 0;
+    Object.entries(securityHeaders).forEach(([header, expectedValue]) => {
+        const headerValue = headers[header.toLowerCase()];
+        if (headerValue) {
+            foundHeaders++;
+        }
+    });
+
+    if (foundHeaders >= 4) {
+        checks.push({
+            name: 'Security Headers',
+            status: 'pass',
+            description: `Strong security headers: ${foundHeaders}/5 implemented`
+        });
+        score += 25;
+    } else if (foundHeaders >= 2) {
+        checks.push({
+            name: 'Security Headers',
+            status: 'warning',
+            description: `Basic security headers: ${foundHeaders}/5 implemented`
+        });
+        score += 15;
+    } else {
+        checks.push({
+            name: 'Security Headers',
+            status: 'fail',
+            description: 'Missing important security headers'
+        });
+    }
+
+    // External resource security
+    const $ = cheerio.load(html);
+    const externalScripts = $('script[src^="http://"]');
+    const externalStyles = $('link[href^="http://"]');
+    
+    if (externalScripts.length === 0 && externalStyles.length === 0) {
+        checks.push({
+            name: 'External Resource Security',
+            status: 'pass',
+            description: 'No insecure external resources loaded'
+        });
+        score += 25;
+    } else {
+        const insecureCount = externalScripts.length + externalStyles.length;
+        checks.push({
+            name: 'External Resource Security',
+            status: 'warning',
+            description: `${insecureCount} external resources loaded over HTTP`
+        });
+        score += 10;
+    }
+
+    // Form security
+    const forms = $('form');
+    const formsWithCSRF = forms.filter((i, form) => {
+        return $(form).find('input[name*="csrf"], input[name*="token"], input[type="hidden"]').length > 0;
+    });
+
+    if (forms.length === 0) {
+        checks.push({
+            name: 'Form Security',
+            status: 'pass',
+            description: 'No forms found to test'
+        });
+        score += 25;
+    } else if (formsWithCSRF.length === forms.length) {
+        checks.push({
+            name: 'Form Security',
+            status: 'pass',
+            description: 'All forms appear to have CSRF protection'
+        });
+        score += 25;
+    } else {
+        checks.push({
+            name: 'Form Security',
+            status: 'warning',
+            description: `${formsWithCSRF.length}/${forms.length} forms have security tokens`
+        });
+        score += 15;
+    }
+
+    return { checks, score: Math.min(score, 100) };
+}
+
+// Advanced JavaScript Analysis using Puppeteer (optional)
+async function analyzeJavaScriptContent(url) {
+    const checks = [];
+    let score = 0;
+    
+    try {
+        // Only run Puppeteer analysis if the package is available
+        let puppeteer;
+        try {
+            puppeteer = require('puppeteer');
+        } catch (e) {
+            throw new Error('Puppeteer not available');
+        }
+        
+        const browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        
+        const page = await browser.newPage();
+        
+        // Set a reasonable timeout
+        await page.setDefaultTimeout(15000);
+        
+        // Navigate to the page
+        await page.goto(url, { waitUntil: 'networkidle2' });
+        
+        // Check for JavaScript errors
+        const jsErrors = await page.evaluate(() => {
+            return window.jsErrors || [];
+        });
+        
+        if (jsErrors.length === 0) {
+            checks.push({
+                name: 'JavaScript Errors',
+                status: 'pass',
+                description: 'No JavaScript errors detected'
+            });
+            score += 25;
+        } else {
+            checks.push({
+                name: 'JavaScript Errors',
+                status: 'warning',
+                description: `${jsErrors.length} JavaScript errors detected`
+            });
+            score += 10;
+        }
+        
+        // Check for dynamic content loading
+        const dynamicContent = await page.evaluate(() => {
+            const bodyText = document.body.innerText;
+            const initialText = document.body.textContent;
+            return bodyText.length > initialText.length * 1.2;
+        });
+        
+        if (dynamicContent) {
+            checks.push({
+                name: 'Dynamic Content',
+                status: 'pass',
+                description: 'Dynamic content loading detected - good for user experience'
+            });
+            score += 25;
+        } else {
+            checks.push({
+                name: 'Dynamic Content',
+                status: 'warning',
+                description: 'Limited dynamic content - consider progressive enhancement'
+            });
+            score += 15;
+        }
+        
+        // Check for service worker
+        const hasServiceWorker = await page.evaluate(() => {
+            return 'serviceWorker' in navigator;
+        });
+        
+        if (hasServiceWorker) {
+            checks.push({
+                name: 'Progressive Web App',
+                status: 'pass',
+                description: 'Service worker detected - PWA capabilities available'
+            });
+            score += 25;
+        } else {
+            checks.push({
+                name: 'Progressive Web App',
+                status: 'warning',
+                description: 'No service worker - consider PWA implementation'
+            });
+            score += 10;
+        }
+        
+        // Check for Web APIs usage
+        const webAPIs = await page.evaluate(() => {
+            const apis = [];
+            if ('localStorage' in window) apis.push('localStorage');
+            if ('sessionStorage' in window) apis.push('sessionStorage');
+            if ('geolocation' in navigator) apis.push('geolocation');
+            if ('pushManager' in window) apis.push('push notifications');
+            return apis;
+        });
+        
+        if (webAPIs.length >= 2) {
+            checks.push({
+                name: 'Modern Web APIs',
+                status: 'pass',
+                description: `Modern web APIs detected: ${webAPIs.join(', ')}`
+            });
+            score += 25;
+        } else if (webAPIs.length >= 1) {
+            checks.push({
+                name: 'Modern Web APIs',
+                status: 'warning',
+                description: `Basic web APIs: ${webAPIs.join(', ')}`
+            });
+            score += 15;
+        } else {
+            checks.push({
+                name: 'Modern Web APIs',
+                status: 'fail',
+                description: 'No modern web APIs detected'
+            });
+        }
+        
+        await browser.close();
+        
+    } catch (error) {
+        // If Puppeteer is not available or fails, provide basic analysis
+        checks.push({
+            name: 'JavaScript Analysis',
+            status: 'warning',
+            description: 'Advanced JavaScript analysis not available - using basic checks'
+        });
+        score += 10;
+    }
+    
+    return { checks, score: Math.min(score, 100) };
+}
+
 // Generate recommendations based on audit results
 function generateRecommendations(auditResults) {
     const recommendations = [];
@@ -601,6 +1225,38 @@ function generateRecommendations(auditResults) {
                             title: 'Create API Documentation',
                             description: 'If you have APIs, document them clearly with OpenAPI/Swagger specs. This enables programmatic AI interactions.',
                             impact: 'Medium - Enables advanced AI integrations'
+                        });
+                        break;
+                    case 'No Structured Data':
+                        recommendations.push({
+                            priority: 'high',
+                            title: 'Implement Schema.org Markup',
+                            description: 'Add JSON-LD structured data to help AI agents understand your content better. Start with Organization, WebSite, and Article schemas.',
+                            impact: 'High - Significantly improves AI content understanding'
+                        });
+                        break;
+                    case 'Open Graph Optimization':
+                        recommendations.push({
+                            priority: 'medium',
+                            title: 'Optimize Open Graph Tags',
+                            description: 'Add complete Open Graph meta tags (og:title, og:description, og:image, og:url) for better social media sharing.',
+                            impact: 'Medium - Improves social media presence'
+                        });
+                        break;
+                    case 'ARIA Implementation':
+                        recommendations.push({
+                            priority: 'medium',
+                            title: 'Implement ARIA Attributes',
+                            description: 'Add ARIA labels, roles, and descriptions to improve accessibility for screen readers and AI agents.',
+                            impact: 'Medium - Enhances accessibility and AI understanding'
+                        });
+                        break;
+                    case 'Security Headers':
+                        recommendations.push({
+                            priority: 'high',
+                            title: 'Implement Security Headers',
+                            description: 'Add security headers like X-Content-Type-Options, X-Frame-Options, and Content-Security-Policy.',
+                            impact: 'High - Essential for security and AI agent trust'
                         });
                         break;
                 }
@@ -700,16 +1356,31 @@ app.post('/api/audit', rateLimit, async (req, res) => {
         }
         
         // Run all analyses if fetch was successful
-        const [contentStructure, aiAccessibility, dataQuality, performance] = await Promise.all([
+        const [contentStructure, aiAccessibility, dataQuality, performance, structuredData, socialMedia, accessibility, security] = await Promise.all([
             analyzeContentStructure(pageData.html, url),
             analyzeAIAccessibility(url, pageData.html),
             analyzeDataQuality(pageData.html, url),
-            analyzePerformance(url, pageData.headers, pageData.html)
+            analyzePerformance(url, pageData.headers, pageData.html),
+            analyzeStructuredData(pageData.html, url),
+            analyzeSocialMedia(pageData.html, url),
+            analyzeAccessibility(pageData.html, url),
+            analyzeSecurity(pageData.html, url, pageData.headers)
         ]);
 
-        // Calculate overall score
+        // Calculate overall score (weighted average)
+        const scores = [
+            contentStructure.score,
+            aiAccessibility.score,
+            dataQuality.score,
+            performance.score,
+            structuredData.score,
+            socialMedia.score,
+            accessibility.score,
+            security.score
+        ];
+        
         const overallScore = Math.round(
-            (contentStructure.score + aiAccessibility.score + dataQuality.score + performance.score) / 4
+            scores.reduce((sum, score) => sum + score, 0) / scores.length
         );
 
         const auditResults = {
@@ -737,6 +1408,26 @@ app.post('/api/audit', rateLimit, async (req, res) => {
                     title: 'Performance & Speed',
                     score: performance.score,
                     checks: performance.checks
+                },
+                structuredData: {
+                    title: 'Structured Data & Schema',
+                    score: structuredData.score,
+                    checks: structuredData.checks
+                },
+                socialMedia: {
+                    title: 'Social Media & Sharing',
+                    score: socialMedia.score,
+                    checks: socialMedia.checks
+                },
+                accessibility: {
+                    title: 'Accessibility & Usability',
+                    score: accessibility.score,
+                    checks: accessibility.checks
+                },
+                security: {
+                    title: 'Security & Privacy',
+                    score: security.score,
+                    checks: security.checks
                 }
             }
         };

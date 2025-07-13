@@ -77,23 +77,29 @@ async function checkBackendConnection() {
 
 // Animate loading steps
 function animateLoadingSteps() {
-    const steps = ['step1', 'step2', 'step3', 'step4'];
+    const steps = ['step1', 'step2', 'step3', 'step4', 'step5', 'step6', 'step7', 'step8', 'step9', 'step10'];
     let currentStep = 0;
 
     const interval = setInterval(() => {
         // Remove active class from all steps
         steps.forEach(step => {
-            document.getElementById(step).classList.remove('active');
+            const element = document.getElementById(step);
+            if (element) {
+                element.classList.remove('active');
+            }
         });
 
         // Add active class to current step
         if (currentStep < steps.length) {
-            document.getElementById(steps[currentStep]).classList.add('active');
+            const element = document.getElementById(steps[currentStep]);
+            if (element) {
+                element.classList.add('active');
+            }
             currentStep++;
         } else {
             clearInterval(interval);
         }
-    }, 800);
+    }, 600); // Slightly faster for more steps
 
     return interval;
 }
