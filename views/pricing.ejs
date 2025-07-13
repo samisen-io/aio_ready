@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - AIO Ready</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="pricing-header">
+            <h1>Choose Your Plan</h1>
+            <p>Start free and upgrade as you grow</p>
+        </div>
+
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <div class="plan-header">
+                    <h3>Free</h3>
+                    <div class="price">
+                        <span class="currency">$</span>
+                        <span class="amount">0</span>
+                        <span class="period">/month</span>
+                    </div>
+                    <p class="plan-description">Perfect for getting started</p>
+                </div>
+                
+                <div class="plan-features">
+                    <ul>
+                        <li>✓ 5 audits per month</li>
+                        <li>✓ Basic audit results</li>
+                        <li>✓ Standard recommendations</li>
+                        <li>✓ JSON export</li>
+                        <li>✓ Community support</li>
+                    </ul>
+                </div>
+                
+                <div class="plan-action">
+                    <% if (user && user.plan === 'free') { %>
+                        <button class="plan-btn current" disabled>Current Plan</button>
+                    <% } else { %>
+                        <a href="/register" class="plan-btn">Get Started Free</a>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="pricing-card featured">
+                <div class="plan-badge">Most Popular</div>
+                <div class="plan-header">
+                    <h3>Pro</h3>
+                    <div class="price">
+                        <span class="currency">$</span>
+                        <span class="amount">19</span>
+                        <span class="period">/month</span>
+                    </div>
+                    <p class="plan-description">For professionals and small teams</p>
+                </div>
+                
+                <div class="plan-features">
+                    <ul>
+                        <li>✓ 50 audits per month</li>
+                        <li>✓ Detailed audit reports</li>
+                        <li>✓ Priority recommendations</li>
+                        <li>✓ Export to PDF/CSV</li>
+                        <li>✓ Email support</li>
+                        <li>✓ API access (1000 requests/month)</li>
+                        <li>✓ Advanced analytics</li>
+                    </ul>
+                </div>
+                
+                <div class="plan-action">
+                    <% if (user && user.plan === 'pro') { %>
+                        <button class="plan-btn current" disabled>Current Plan</button>
+                    <% } else if (user) { %>
+                        <button class="plan-btn upgrade" onclick="upgradeToPro()">Upgrade to Pro</button>
+                    <% } else { %>
+                        <a href="/register?plan=pro" class="plan-btn">Start Pro Trial</a>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="pricing-card">
+                <div class="plan-header">
+                    <h3>Business</h3>
+                    <div class="price">
+                        <span class="currency">$</span>
+                        <span class="amount">49</span>
+                        <span class="period">/month</span>
+                    </div>
+                    <p class="plan-description">For growing businesses</p>
+                </div>
+                
+                <div class="plan-features">
+                    <ul>
+                        <li>✓ 200 audits per month</li>
+                        <li>✓ Advanced analytics</li>
+                        <li>✓ Custom recommendations</li>
+                        <li>✓ Team collaboration</li>
+                        <li>✓ Priority support</li>
+                        <li>✓ API access (5000 requests/month)</li>
+                        <li>✓ White-label options</li>
+                        <li>✓ Custom integrations</li>
+                    </ul>
+                </div>
+                
+                <div class="plan-action">
+                    <% if (user && user.plan === 'business') { %>
+                        <button class="plan-btn current" disabled>Current Plan</button>
+                    <% } else if (user) { %>
+                        <button class="plan-btn upgrade" onclick="upgradeToBusiness()">Upgrade to Business</button>
+                    <% } else { %>
+                        <a href="/register?plan=business" class="plan-btn">Start Business Trial</a>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+
+        <div class="pricing-faq">
+            <h2>Frequently Asked Questions</h2>
+            
+            <div class="faq-item">
+                <h3>Can I cancel anytime?</h3>
+                <p>Yes, you can cancel your subscription at any time. You'll continue to have access to your plan until the end of your billing period.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>Do audit limits reset monthly?</h3>
+                <p>Yes, your audit count resets on the first day of each month. Unused audits don't carry over to the next month.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>What happens if I reach my audit limit?</h3>
+                <p>You'll need to upgrade to a higher plan or wait until your limit resets next month. We'll notify you when you're close to your limit.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>Is there a free trial?</h3>
+                <p>Yes! You can start with our free plan and upgrade anytime. All paid plans come with a 7-day money-back guarantee.</p>
+            </div>
+            
+            <div class="faq-item">
+                <h3>Do you offer refunds?</h3>
+                <p>We offer a 7-day money-back guarantee for all paid plans. If you're not satisfied, contact us within 7 days for a full refund.</p>
+            </div>
+        </div>
+
+        <div class="pricing-cta">
+            <h2>Ready to optimize your website for AI?</h2>
+            <p>Join thousands of professionals who trust AIO Ready for their website optimization needs.</p>
+            <a href="/register" class="cta-btn">Get Started Free</a>
+        </div>
+    </div>
+
+    <% if (user) { %>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        const stripe = Stripe('<%= stripePublishableKey %>');
+        
+        async function upgradeToPro() {
+            try {
+                const response = await fetch('/api/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan: 'pro' })
+                });
+                
+                const { sessionId } = await response.json();
+                const result = await stripe.redirectToCheckout({ sessionId });
+                
+                if (result.error) {
+                    alert(result.error.message);
+                }
+            } catch (error) {
+                alert('Error creating checkout session. Please try again.');
+            }
+        }
+        
+        async function upgradeToBusiness() {
+            try {
+                const response = await fetch('/api/create-checkout-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan: 'business' })
+                });
+                
+                const { sessionId } = await response.json();
+                const result = await stripe.redirectToCheckout({ sessionId });
+                
+                if (result.error) {
+                    alert(result.error.message);
+                }
+            } catch (error) {
+                alert('Error creating checkout session. Please try again.');
+            }
+        }
+    </script>
+    <% } %>
+</body>
+</html> 

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AIO Ready</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="dashboard-header">
+            <div class="user-info">
+                <h1>Welcome back, <%= user.email %></h1>
+                <p>Your AIO Ready Dashboard</p>
+            </div>
+            <div class="user-actions">
+                <a href="/pricing" class="btn-secondary">View Plans</a>
+                <a href="/logout" class="btn-logout">Sign Out</a>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <h3>Current Plan</h3>
+                    <div class="stat-value"><%= user.plan.toUpperCase() %></div>
+                    <% if (user.plan === 'free') { %>
+                        <a href="/pricing" class="upgrade-link">Upgrade Now</a>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon">🔍</div>
+                <div class="stat-content">
+                    <h3>Audits Used</h3>
+                    <div class="stat-value"><%= user.audit_count %> / <%= limits[user.plan] %></div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: <%= Math.min((user.audit_count / limits[user.plan]) * 100, 100) %>%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon">📅</div>
+                <div class="stat-content">
+                    <h3>Member Since</h3>
+                    <div class="stat-value"><%= new Date(user.created_at).toLocaleDateString() %></div>
+                </div>
+            </div>
+        </div>
+
+        <% if (user.plan === 'free' && user.audit_count >= 3) { %>
+        <div class="upgrade-banner">
+            <div class="upgrade-content">
+                <h3>🚀 Ready to unlock more power?</h3>
+                <p>You've used <%= user.audit_count %> of your <%= limits[user.plan] %> free audits. Upgrade to Pro for 50 audits per month and advanced features!</p>
+                <div class="upgrade-features">
+                    <span>✓ 50 audits per month</span>
+                    <span>✓ Detailed reports</span>
+                    <span>✓ Priority support</span>
+                    <span>✓ Export to PDF/CSV</span>
+                </div>
+                <a href="/pricing" class="upgrade-btn">Upgrade to Pro - $19/month</a>
+            </div>
+        </div>
+        <% } %>
+
+        <div class="audit-section">
+            <div class="section-header">
+                <h2>Run New Audit</h2>
+                <p>Analyze a website for AI optimization readiness</p>
+            </div>
+
+            <div class="audit-form">
+                <div id="apiStatus" class="api-status disconnected">
+                    🔍 Checking backend connection...
+                </div>
+                <form id="auditForm" onsubmit="return false;">
+                    <div class="form-group">
+                        <input 
+                            type="url" 
+                            class="url-input" 
+                            id="websiteUrl" 
+                            name="url"
+                            placeholder="Enter website URL (e.g., https://example.com)" 
+                            required
+                        >
+                        <button type="button" class="audit-btn" id="auditBtn">
+                            <span id="btnText">Run Audit</span>
+                            <span id="btnSpinner" class="btn-spinner" style="display: none;">⏳</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p id="loadingText">Analyzing your website for AI optimization...</p>
+                <div class="loading-steps">
+                    <div class="step" id="step1">📄 Fetching page content</div>
+                    <div class="step" id="step2">🔍 Analyzing structure & markup</div>
+                    <div class="step" id="step3">🤖 Checking AI accessibility</div>
+                    <div class="step" id="step4">📊 Analyzing data quality</div>
+                    <div class="step" id="step5">⚡ Testing performance</div>
+                    <div class="step" id="step6">🏷️ Checking structured data</div>
+                    <div class="step" id="step7">📱 Analyzing social media</div>
+                    <div class="step" id="step8">♿ Testing accessibility</div>
+                    <div class="step" id="step9">🔒 Checking security</div>
+                    <div class="step" id="step10">📋 Generating recommendations</div>
+                </div>
+            </div>
+
+            <div class="results" id="results">
+                <div class="score-overview">
+                    <div class="overall-score" id="overallScore">0</div>
+                    <div class="score-label">Overall AIO Score</div>
+                    <div class="score-description" id="scoreDescription"></div>
+                </div>
+
+                <div class="audit-sections" id="auditSections">
+                    <!-- Audit sections will be populated here -->
+                </div>
+
+                <div class="recommendations" id="recommendations">
+                    <h3>🎯 Priority Recommendations</h3>
+                    <div id="recommendationsList">
+                        <!-- Recommendations will be populated here -->
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="action-btn secondary" id="exportBtn">📄 Export Report</button>
+                    <button class="action-btn primary" id="newAuditBtn">🔄 Run New Audit</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="recent-audits">
+            <h2>Recent Audits</h2>
+            <% if (recentAudits && recentAudits.length > 0) { %>
+                <div class="audits-grid">
+                    <% recentAudits.forEach(audit => { %>
+                        <div class="audit-card">
+                            <div class="audit-url"><%= audit.url %></div>
+                            <div class="audit-score">Score: <%= audit.results.overallScore || 'N/A' %></div>
+                            <div class="audit-date"><%= new Date(audit.created_at).toLocaleDateString() %></div>
+                            <a href="/audit/<%= audit.id %>" class="view-audit">View Details</a>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } else { %>
+                <div class="empty-state">
+                    <p>No audits yet. Run your first audit to get started!</p>
+                </div>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Include JavaScript -->
+    <script src="/js/audit.js"></script>
+    <script>
+        // Template variables for JavaScript
+        window.APP_CONFIG = {
+            apiBaseUrl: '<%= apiBaseUrl || "http://localhost:3000" %>',
+            appName: '<%= appName %>',
+            version: '<%= version || "1.0.0" %>',
+            isDevelopment: '<%= isDevelopment || false %>'
+        };
+
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeAuditApp();
+            
+            // Add event listeners for buttons
+            document.getElementById('auditBtn').addEventListener('click', startAudit);
+            document.getElementById('exportBtn').addEventListener('click', exportResults);
+            document.getElementById('newAuditBtn').addEventListener('click', runNewAudit);
+        });
+    </script>
+</body>
+</html> 
