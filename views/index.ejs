@@ -39,16 +39,9 @@
                         <span id="btnSpinner" class="btn-spinner" style="display: none;">⏳</span>
                     </button>
                 </div>
-                <% if (typeof showExamples !== 'undefined' && showExamples) { %>
-                <div class="example-urls">
-                    <p><strong>Try these examples:</strong></p>
-                    <div class="example-buttons">
-                        <button type="button" class="example-btn" data-url="https://github.com">GitHub</button>
-                        <button type="button" class="example-btn" data-url="https://stackoverflow.com">Stack Overflow</button>
-                        <button type="button" class="example-btn" data-url="https://wikipedia.org">Wikipedia</button>
-                    </div>
+                <div class="form-info">
+                    <p><strong>Note:</strong> This tool requires a running backend server to perform real-time analysis. All scores are computed from actual website analysis.</p>
                 </div>
-                <% } %>
             </form>
         </div>
 
@@ -126,19 +119,7 @@
             document.getElementById('auditBtn').addEventListener('click', startAudit);
             document.getElementById('exportBtn').addEventListener('click', exportResults);
             document.getElementById('newAuditBtn').addEventListener('click', runNewAudit);
-            
-            // Example URL buttons
-            document.querySelectorAll('.example-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    setExampleUrl(this.dataset.url);
-                });
-            });
         });
-
-        function setExampleUrl(url) {
-            document.getElementById('websiteUrl').value = url;
-            document.getElementById('websiteUrl').focus();
-        }
 
         function runNewAudit() {
             document.getElementById('results').style.display = 'none';

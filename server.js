@@ -1289,7 +1289,6 @@ app.get('/', (req, res) => {
         apiBaseUrl: NODE_ENV === 'production' ? req.protocol + '://' + req.get('host') : 'http://localhost:3000',
         isDevelopment: NODE_ENV === 'development',
         defaultUrl: '',
-        showExamples: true,
         showFooter: true
     });
 });

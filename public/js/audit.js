@@ -66,8 +66,8 @@ async function checkBackendConnection() {
         }
     } catch (error) {
         isBackendConnected = false;
-        apiStatus.className = 'api-status demo-mode';
-        apiStatus.innerHTML = '⚠️ Backend disconnected - Running in demo mode with sample data';
+        apiStatus.className = 'api-status disconnected';
+        apiStatus.innerHTML = '❌ Backend disconnected - Analysis unavailable';
         
         if (window.APP_CONFIG.isDevelopment) {
             console.warn('Backend connection failed:', error.message);
@@ -117,6 +117,12 @@ async function startAudit() {
         return;
     }
 
+    // Check if backend is connected
+    if (!isBackendConnected) {
+        alert('Backend server is not connected. Please ensure the server is running and try again.');
+        return;
+    }
+
     // Show loading state
     document.getElementById('loading').style.display = 'block';
     document.getElementById('results').style.display = 'none';
@@ -128,50 +134,43 @@ async function startAudit() {
     const loadingInterval = animateLoadingSteps();
 
     try {
-        if (isBackendConnected) {
-            // Use real backend API
-            const response = await fetch(`${window.APP_CONFIG.apiBaseUrl}/api/audit`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ url })
-            });
+        // Use real backend API
+        const response = await fetch(`${window.APP_CONFIG.apiBaseUrl}/api/audit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url })
+        });
 
-            const data = await response.json();
-            
-            if (response.ok && data.success) {
-                auditData = data.audit;
-                auditData.recommendations = data.recommendations;
-                displayAuditResults();
-            } else {
-                throw new Error(data.error || data.message || 'Audit failed');
-            }
-        } else {
-            // Fall back to demo mode
-            document.getElementById('loadingText').textContent = 'Running in demo mode...';
-            await new Promise(resolve => setTimeout(resolve, 4000));
-            auditData = generateMockAuditResults(url);
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            auditData = data.audit;
+            auditData.recommendations = data.recommendations;
             displayAuditResults();
+        } else {
+            throw new Error(data.error || data.message || 'Audit failed');
         }
         
     } catch (error) {
         console.error('Audit failed:', error);
         clearInterval(loadingInterval);
         
+        // Show specific error message
+        let errorMessage = 'Audit failed: ' + error.message;
+        
         if (error.name === 'TypeError' || error.message.includes('fetch')) {
-            // Switch to demo mode if API fails
-            isBackendConnected = false;
-            document.getElementById('apiStatus').className = 'api-status demo-mode';
-            document.getElementById('apiStatus').innerHTML = '⚠️ Backend disconnected - Falling back to demo mode';
-            document.getElementById('loadingText').textContent = 'Switching to demo mode...';
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            auditData = generateMockAuditResults(url);
-            displayAuditResults();
-        } else {
-            alert('Audit failed: ' + error.message);
+            errorMessage = 'Cannot connect to the analysis server. Please ensure the backend is running and try again.';
+        } else if (error.message.includes('403')) {
+            errorMessage = 'Access denied: The website is blocking automated analysis. This is common for sites with bot protection.';
+        } else if (error.message.includes('404')) {
+            errorMessage = 'Page not found: The URL does not exist or is not accessible.';
+        } else if (error.message.includes('timeout')) {
+            errorMessage = 'Analysis timeout: The website took too long to respond. Please try again.';
         }
+        
+        alert(errorMessage);
     } finally {
         clearInterval(loadingInterval);
         document.getElementById('loading').style.display = 'none';
@@ -179,125 +178,6 @@ async function startAudit() {
         document.getElementById('btnText').style.display = 'inline';
         document.getElementById('btnSpinner').style.display = 'none';
     }
-}
-
-// Generate mock audit results for demo mode
-function generateMockAuditResults(url) {
-    const domain = new URL(url).hostname;
-    const baseScore = Math.floor(Math.random() * 30) + 60; // 60-90 base score
-    
-    return {
-        url: url,
-        domain: domain,
-        timestamp: new Date().toISOString(),
-        overallScore: baseScore + Math.floor(Math.random() * 10),
-        sections: {
-            contentStructure: {
-                title: 'Content Structure & Markup',
-                score: baseScore + Math.floor(Math.random() * 20) - 10,
-                checks: [
-                    { 
-                        name: 'Semantic HTML Usage', 
-                        status: Math.random() > 0.3 ? 'pass' : 'warning', 
-                        description: 'Website uses proper HTML5 semantic elements' 
-                    },
-                    { 
-                        name: 'Heading Hierarchy', 
-                        status: Math.random() > 0.2 ? 'pass' : 'fail', 
-                        description: 'Clear H1-H6 structure found' 
-                    },
-                    { 
-                        name: 'Meta Descriptions', 
-                        status: Math.random() > 0.4 ? 'warning' : 'pass', 
-                        description: 'Some pages missing meta descriptions' 
-                    },
-                    { 
-                        name: 'Structured Data', 
-                        status: Math.random() > 0.6 ? 'fail' : 'pass', 
-                        description: domain.includes('github') || domain.includes('wikipedia') ? 'Schema.org markup detected' : 'No Schema.org markup detected' 
-                    }
-                ]
-            },
-            aiAccessibility: {
-                title: 'AI Agent Accessibility',
-                score: baseScore + Math.floor(Math.random() * 15) - 5,
-                checks: [
-                    { 
-                        name: 'Robots.txt Present', 
-                        status: 'pass', 
-                        description: 'Valid robots.txt file found' 
-                    },
-                    { 
-                        name: 'Crawl Rate Friendly', 
-                        status: 'pass', 
-                        description: 'Server responds well to requests' 
-                    },
-                    { 
-                        name: 'Content Without JS', 
-                        status: Math.random() > 0.5 ? 'warning' : 'pass', 
-                        description: 'Some content requires JavaScript' 
-                    },
-                    { 
-                        name: 'XML Sitemap', 
-                        status: Math.random() > 0.3 ? 'pass' : 'warning', 
-                        description: 'XML sitemap found at standard location' 
-                    }
-                ]
-            },
-            dataQuality: {
-                title: 'Data Quality & Format',
-                score: baseScore + Math.floor(Math.random() * 25) - 10,
-                checks: [
-                    { 
-                        name: 'Content Format Quality', 
-                        status: 'pass', 
-                        description: 'Content is well-formatted and readable' 
-                    },
-                    { 
-                        name: 'Image Optimization', 
-                        status: Math.random() > 0.4 ? 'warning' : 'pass', 
-                        description: 'Some images missing alt attributes' 
-                    },
-                    { 
-                        name: 'Contact Information', 
-                        status: Math.random() > 0.3 ? 'pass' : 'warning', 
-                        description: 'Clear contact details available' 
-                    },
-                    { 
-                        name: 'Content Consistency', 
-                        status: Math.random() > 0.4 ? 'pass' : 'warning', 
-                        description: 'Data structure varies across pages' 
-                    }
-                ]
-            },
-            performance: {
-                title: 'Performance & Speed',
-                score: baseScore + Math.floor(Math.random() * 20),
-                checks: [
-                    { 
-                        name: 'HTTPS Security', 
-                        status: url.startsWith('https') ? 'pass' : 'fail', 
-                        description: url.startsWith('https') ? 'Site uses secure HTTPS protocol' : 'Site does not use HTTPS' 
-                    },
-                    { 
-                        name: 'Mobile Responsiveness', 
-                        status: 'pass', 
-                        description: 'Website is mobile-friendly' 
-                    },
-                    { 
-                        name: 'Content Compression', 
-                        status: Math.random() > 0.3 ? 'pass' : 'warning', 
-                        description: 'Content compression detected' 
-                    },
-                    { 
-                        name: 'Caching Strategy', 
-                        status: Math.random() > 0.4 ? 'pass' : 'warning', 
-                        description: 'Caching headers present' 
-                    }
-                ]
-            }
-        }
-    };
 }
 
 // Display audit results
@@ -511,7 +391,7 @@ function generateFallbackRecommendations() {
     }
     
     // Add performance recommendations
-    if (auditData.sections.performance.score < 80) {
+    if (auditData.sections.performance && auditData.sections.performance.score < 80) {
         recommendations.push({
             priority: 'medium',
             title: 'Optimize Site Performance',
@@ -636,5 +516,3 @@ function setExampleUrl(url) {
 function formatTimestamp(timestamp) {
     return new Date(timestamp).toLocaleString();
 }
-
-// Service worker registration removed - add back if you want PWA capabilities

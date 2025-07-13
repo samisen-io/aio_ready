@@ -127,6 +127,21 @@ body {
     border-color: #667eea;
 }
 
+.form-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+}
+
+.form-info p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
 .loading {
     display: none;
     text-align: center;
@@ -355,11 +370,7 @@ body {
     border: 1px solid #f5c6cb;
 }
 
-.demo-mode {
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeaa7;
-}
+
 
 .actions {
     display: flex;
