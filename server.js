@@ -14,11 +14,20 @@ const cheerio = require('cheerio');
 const robotsParser = require('robots-parser');
 const validator = require('validator');
 const urlParse = require('url-parse');
+const { PageDataExtractor } = require('./services/llmOptimizer/pageDataExtractor');
+const { AnthropicClient } = require('./services/llmOptimizer/anthropicClient');
+const { MarkupService } = require('./services/llmOptimizer/markupService');
+const { createLlmOptimizerRouter } = require('./routes/llmOptimizer');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const LLM_OPTIMIZER_BASE_PATH = '/llm-optimizer';
+
+const llmPageDataExtractor = new PageDataExtractor();
+const llmAnthropicClient = new AnthropicClient();
+const llmMarkupService = new MarkupService(llmPageDataExtractor, llmAnthropicClient);
 
 // View engine setup
 app.set('view engine', 'ejs');
@@ -51,6 +60,19 @@ app.use('/css', express.static(path.join(__dirname, 'public/css')));
 app.use('/js', express.static(path.join(__dirname, 'public/js')));
 app.use('/images', express.static(path.join(__dirname, 'public/images')));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(
+    `${LLM_OPTIMIZER_BASE_PATH}/assets`,
+    express.static(path.join(__dirname, 'public', 'llm-optimizer'))
+);
+
+app.get(LLM_OPTIMIZER_BASE_PATH, (req, res) => {
+    res.render('llm-optimizer', {
+        basePath: LLM_OPTIMIZER_BASE_PATH,
+        assetsPath: `${LLM_OPTIMIZER_BASE_PATH}/assets`
+    });
+});
+
+app.use(`${LLM_OPTIMIZER_BASE_PATH}/api`, createLlmOptimizerRouter(llmMarkupService));
 
 // Rate limiting (simple in-memory implementation)
 const rateLimitMap = new Map();

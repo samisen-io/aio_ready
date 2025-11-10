@@ -19,6 +19,12 @@
             <% } %>
         </div>
 
+        <div class="header-actions">
+            <button type="button" class="action-btn secondary" id="llmOptimizerBtn">
+                Launch LLM Optimizer
+            </button>
+        </div>
+
         <div class="audit-form">
             <div id="apiStatus" class="api-status disconnected">
                 🔍 Checking backend connection...
@@ -119,6 +125,13 @@
             document.getElementById('auditBtn').addEventListener('click', startAudit);
             document.getElementById('exportBtn').addEventListener('click', exportResults);
             document.getElementById('newAuditBtn').addEventListener('click', runNewAudit);
+
+            var llmOptimizerBtn = document.getElementById('llmOptimizerBtn');
+            if (llmOptimizerBtn) {
+                llmOptimizerBtn.addEventListener('click', function() {
+                    window.location.href = '/llm-optimizer';
+                });
+            }
         });
 
         function runNewAudit() {
