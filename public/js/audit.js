@@ -1,6 +1,23 @@
 let auditData = {};
 let isBackendConnected = false;
 
+const apiBaseUrl = (() => {
+    const configured =
+        window.APP_CONFIG && typeof window.APP_CONFIG.apiBaseUrl === 'string'
+            ? window.APP_CONFIG.apiBaseUrl.trim()
+            : '';
+
+    if (!configured) {
+        return '';
+    }
+
+    return configured.endsWith('/')
+        ? configured.replace(/\/+$/, '')
+        : configured;
+})();
+
+const buildApiUrl = (path) => `${apiBaseUrl}${path}`;
+
 // Initialize the audit app
 function initializeAuditApp() {
     checkBackendConnection();
@@ -49,7 +66,7 @@ async function checkBackendConnection() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch(`${window.APP_CONFIG.apiBaseUrl}/api/health`, {
+        const response = await fetch(buildApiUrl('/api/health'), {
             method: 'GET',
             signal: controller.signal
         });
@@ -135,7 +152,7 @@ async function startAudit() {
 
     try {
         // Use real backend API
-        const response = await fetch(`${window.APP_CONFIG.apiBaseUrl}/api/audit`, {
+        const response = await fetch(buildApiUrl('/api/audit'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

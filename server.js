@@ -21,6 +21,7 @@ const { createLlmOptimizerRouter } = require('./routes/llmOptimizer');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const LLM_OPTIMIZER_BASE_PATH = '/llm-optimizer';
@@ -105,6 +106,17 @@ const rateLimit = (req, res, next) => {
     userData.count++;
     next();
 };
+
+function getRequestProtocol(req) {
+    if (req.secure) {
+        return 'https';
+    }
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    if (forwardedProto) {
+        return forwardedProto.split(',')[0];
+    }
+    return req.protocol;
+}
 
 // Helper function to fetch page content with better error handling
 async function fetchPageContent(url, timeout = 10000) {
@@ -1303,12 +1315,16 @@ function generateRecommendations(auditResults) {
 
 // Homepage route
 app.get('/', (req, res) => {
+    const apiBaseUrl = NODE_ENV === 'production'
+        ? `${getRequestProtocol(req)}://${req.get('host')}`
+        : `http://localhost:${PORT}`;
+
     res.render('index', {
         pageTitle: 'AIO Ready - Website AI Optimization Audit',
         appName: 'AIO Ready',
         appDescription: 'Audit your website\'s readiness for AI optimization',
         version: '1.0.0',
-        apiBaseUrl: NODE_ENV === 'production' ? req.protocol + '://' + req.get('host') : 'http://localhost:3000',
+        apiBaseUrl,
         isDevelopment: NODE_ENV === 'development',
         defaultUrl: '',
         showFooter: true
