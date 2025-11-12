@@ -37,7 +37,7 @@
     "morgan": "^1.10.0",
     "node-fetch": "^2.7.0",
     "path": "^0.12.7",
-    "puppeteer": "^21.5.2",
+    "puppeteer": "^24.29.1",
     "robots-parser": "^3.0.1",
     "url-parse": "^1.5.10",
     "validator": "^13.11.0"
