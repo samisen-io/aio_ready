@@ -1,22 +1,30 @@
 let auditData = {};
 let isBackendConnected = false;
 
-const apiBaseUrl = (() => {
-    const configured =
-        window.APP_CONFIG && typeof window.APP_CONFIG.apiBaseUrl === 'string'
-            ? window.APP_CONFIG.apiBaseUrl.trim()
-            : '';
+const _scriptEl = document.currentScript || document.querySelector('script[data-api-base-url]');
+const APP_CONFIG = {
+    apiBaseUrl: (_scriptEl && _scriptEl.dataset.apiBaseUrl || '').replace(/\/+$/, ''),
+    appName: (_scriptEl && _scriptEl.dataset.appName) || 'AIO Ready',
+    version: (_scriptEl && _scriptEl.dataset.version) || '1.0.0',
+    isDevelopment: (_scriptEl && _scriptEl.dataset.isDevelopment) === 'true'
+};
 
-    if (!configured) {
-        return '';
+const buildApiUrl = (path) => `${APP_CONFIG.apiBaseUrl}${path}`;
+
+document.addEventListener('DOMContentLoaded', function () {
+    initializeAuditApp();
+
+    document.getElementById('auditBtn').addEventListener('click', startAudit);
+    document.getElementById('exportBtn').addEventListener('click', exportResults);
+    document.getElementById('newAuditBtn').addEventListener('click', runNewAudit);
+
+    var llmOptimizerBtn = document.getElementById('llmOptimizerBtn');
+    if (llmOptimizerBtn) {
+        llmOptimizerBtn.addEventListener('click', function () {
+            window.location.href = '/llm-optimizer';
+        });
     }
-
-    return configured.endsWith('/')
-        ? configured.replace(/\/+$/, '')
-        : configured;
-})();
-
-const buildApiUrl = (path) => `${apiBaseUrl}${path}`;
+});
 
 // Initialize the audit app
 function initializeAuditApp() {
@@ -86,7 +94,7 @@ async function checkBackendConnection() {
         apiStatus.className = 'api-status disconnected';
         apiStatus.innerHTML = '❌ Backend disconnected - Analysis unavailable';
         
-        if (window.APP_CONFIG.isDevelopment) {
+        if (APP_CONFIG.isDevelopment) {
             console.warn('Backend connection failed:', error.message);
         }
     }
@@ -430,8 +438,8 @@ function exportResults() {
     const reportData = {
         ...auditData,
         exportedAt: new Date().toISOString(),
-        exportedBy: window.APP_CONFIG.appName,
-        exportVersion: window.APP_CONFIG.version
+        exportedBy: APP_CONFIG.appName,
+        exportVersion: APP_CONFIG.version
     };
 
     // Create downloadable JSON report

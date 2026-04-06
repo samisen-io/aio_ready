@@ -1,19 +1,14 @@
-// package.json dependencies needed:
-// npm install express cors helmet morgan compression dotenv ejs
-// npm install axios cheerio robots-parser lighthouse chrome-launcher
-// npm install validator url-parse path puppeteer
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const robotsParser = require('robots-parser');
 const validator = require('validator');
-const urlParse = require('url-parse');
 const { PageDataExtractor } = require('./services/llmOptimizer/pageDataExtractor');
 const { AnthropicClient } = require('./services/llmOptimizer/anthropicClient');
 const { MarkupService } = require('./services/llmOptimizer/markupService');
@@ -40,7 +35,7 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
             imgSrc: ["'self'", "data:", "https:"],
             connectSrc: ["'self'"],
             fontSrc: ["'self'"],
@@ -50,7 +45,16 @@ app.use(helmet({
         },
     },
 }));
-app.use(cors());
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : (NODE_ENV === 'production' ? [] : true);
+
+app.use(cors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json());
@@ -75,37 +79,14 @@ app.get(LLM_OPTIMIZER_BASE_PATH, (req, res) => {
 
 app.use(`${LLM_OPTIMIZER_BASE_PATH}/api`, createLlmOptimizerRouter(llmMarkupService));
 
-// Rate limiting (simple in-memory implementation)
-const rateLimitMap = new Map();
-
-const rateLimit = (req, res, next) => {
-    const ip = req.ip;
-    const now = Date.now();
-    const windowMs = 15 * 60 * 1000; // 15 minutes
-    const maxRequests = 10;
-
-    if (!rateLimitMap.has(ip)) {
-        rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
-        return next();
-    }
-
-    const userData = rateLimitMap.get(ip);
-    if (now > userData.resetTime) {
-        userData.count = 1;
-        userData.resetTime = now + windowMs;
-        return next();
-    }
-
-    if (userData.count >= maxRequests) {
-        return res.status(429).json({
-            error: 'Rate limit exceeded. Please try again later.',
-            retryAfter: Math.ceil((userData.resetTime - now) / 1000)
-        });
-    }
-
-    userData.count++;
-    next();
-};
+// Rate limiting
+const auditRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Rate limit exceeded. Please try again later.' }
+});
 
 function getRequestProtocol(req) {
     if (req.secure) {
@@ -121,9 +102,9 @@ function getRequestProtocol(req) {
 // Helper function to fetch page content with better error handling
 async function fetchPageContent(url, timeout = 10000) {
     const userAgents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
     ];
     
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
@@ -286,8 +267,8 @@ function analyzeContentStructure(html, url) {
 async function analyzeAIAccessibility(url, html) {
     const checks = [];
     let score = 0;
-    const parsedUrl = urlParse(url);
-    const baseUrl = `${parsedUrl.protocol}//${parsedUrl.host}`;
+    const { protocol, host } = new URL(url);
+    const baseUrl = `${protocol}//${host}`;
 
     // Robots.txt check
     try {
@@ -1360,7 +1341,7 @@ app.get('/contact', (req, res) => {
 });
 
 // Main audit endpoint with better error handling
-app.post('/api/audit', rateLimit, async (req, res) => {
+app.post('/api/audit', auditRateLimit, async (req, res) => {
     try {
         const { url } = req.body;
         
@@ -1422,7 +1403,7 @@ app.post('/api/audit', rateLimit, async (req, res) => {
 
         const auditResults = {
             url: pageData.url,
-            domain: urlParse(url).hostname,
+            domain: new URL(url).hostname,
             timestamp: new Date().toISOString(),
             overallScore,
             sections: {
@@ -1490,7 +1471,7 @@ app.post('/api/audit', rateLimit, async (req, res) => {
 
 // Generate limited audit for sites that block access
 function generateLimitedAudit(url, fetchError) {
-    const domain = urlParse(url).hostname;
+    const domain = new URL(url).hostname;
     const isHttps = url.startsWith('https://');
     
     return {

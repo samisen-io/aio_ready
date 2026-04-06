@@ -107,64 +107,11 @@
     </div>
 
     <!-- Include JavaScript -->
-    <script src="/js/audit.js"></script>
-    <script>
-        // Template variables for JavaScript
-        window.APP_CONFIG = {
-            apiBaseUrl: '<%= apiBaseUrl || "http://localhost:3000" %>',
-            appName: '<%= appName %>',
-            version: '<%= version || "1.0.0" %>',
-            isDevelopment: '<%= isDevelopment || false %>'
-        };
-
-        // Initialize app when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeAuditApp();
-            
-            // Add event listeners for buttons
-            document.getElementById('auditBtn').addEventListener('click', startAudit);
-            document.getElementById('exportBtn').addEventListener('click', exportResults);
-            document.getElementById('newAuditBtn').addEventListener('click', runNewAudit);
-
-            var llmOptimizerBtn = document.getElementById('llmOptimizerBtn');
-            if (llmOptimizerBtn) {
-                llmOptimizerBtn.addEventListener('click', function() {
-                    window.location.href = '/llm-optimizer';
-                });
-            }
-        });
-
-        function runNewAudit() {
-            document.getElementById('results').style.display = 'none';
-            document.getElementById('websiteUrl').value = '';
-            document.getElementById('websiteUrl').focus();
-        }
-
-        function exportResults() {
-            if (!auditData) {
-                alert('No audit results to export');
-                return;
-            }
-
-            const reportData = {
-                ...auditData,
-                exportedAt: new Date().toISOString(),
-                exportedBy: window.APP_CONFIG.appName
-            };
-
-            const blob = new Blob([JSON.stringify(reportData, null, 2)], {
-                type: 'application/json'
-            });
-
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `aio-audit-${auditData.domain}-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
+    <script src="/js/audit.js"
+        data-api-base-url="<%= apiBaseUrl || '' %>"
+        data-app-name="<%= appName %>"
+        data-version="<%= version || '1.0.0' %>"
+        data-is-development="<%= isDevelopment || false %>">
     </script>
 </body>
 </html>

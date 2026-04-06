@@ -1,68 +1,44 @@
-const fetch = require('node-fetch');
+const Anthropic = require('@anthropic-ai/sdk');
 const { HttpError } = require('../../lib/httpError');
 
-const CODE_FENCE_REGEX = /```json|```/gi;
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
 
 class AnthropicClient {
   constructor(options = {}) {
-    this.fetchImpl = options.fetchImpl || fetch;
-    this.baseUrl = options.baseUrl || 'https://api.anthropic.com';
-    this.defaultModel = options.model || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
-    this.apiKey = options.apiKey || process.env.ANTHROPIC_API_KEY || '';
+    this.model = options.model || ANTHROPIC_MODEL;
+    this._client = options.client || null;
   }
 
-  resolveApiKey() {
-    return optionsApiKey(this.apiKey, process.env.ANTHROPIC_API_KEY);
+  _getClient() {
+    if (!this._client) {
+      const apiKey = process.env.ANTHROPIC_API_KEY || '';
+      if (!apiKey.trim()) {
+        throw new HttpError(
+          500,
+          'Anthropic API key is not configured. Set ANTHROPIC_API_KEY in your environment.'
+        );
+      }
+      this._client = new Anthropic({ apiKey });
+    }
+    return this._client;
   }
 
   async generateMarkup(pageData) {
-    const apiKey = this.resolveApiKey();
-    if (!apiKey) {
-      throw new HttpError(
-        500,
-        'Anthropic API key is not configured. Set ANTHROPIC_API_KEY in your environment.'
-      );
-    }
+    const client = this._getClient();
 
-    const payload = {
-      model: this.defaultModel,
-      max_tokens: 2000,
-      messages: [
-        {
-          role: 'user',
-          content: this.buildPrompt(pageData),
-        },
-      ],
-    };
-
-    const response = await this.fetchImpl(`${this.baseUrl}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const body = await response.text();
-
-    if (!response.ok) {
-      throw new HttpError(
-        response.status,
-        `Anthropic API returned ${response.status}`,
-        body.slice(0, 500)
-      );
-    }
-
-    let json;
+    let message;
     try {
-      json = JSON.parse(body);
-    } catch {
-      throw new HttpError(502, 'Anthropic API returned invalid JSON.');
+      message = await client.messages.create({
+        model: this.model,
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: this.buildPrompt(pageData) }],
+      });
+    } catch (err) {
+      const status = err.status || 500;
+      throw new HttpError(status, `Anthropic API error: ${err.message}`);
     }
 
-    return this.extractMarkup(json);
+    return this.extractMarkup(message);
   }
 
   buildPrompt(pageData) {
@@ -100,54 +76,28 @@ class AnthropicClient {
     ].join('\n');
   }
 
-  extractMarkup(responseBody) {
-    let rawText = '';
-    const content = responseBody?.content;
-
-    if (Array.isArray(content) && content.length > 0) {
-      const first = content[0];
-      if (typeof first === 'string') {
-        rawText = first;
-      } else if (typeof first?.text === 'string') {
-        rawText = first.text;
-      }
-    } else if (typeof content === 'string') {
-      rawText = content;
-    }
+  extractMarkup(message) {
+    const block = message?.content?.[0];
+    const rawText = typeof block?.text === 'string' ? block.text.trim() : '';
 
     if (!rawText) {
       throw new HttpError(502, 'Anthropic response did not contain text content.');
     }
 
-    const cleaned = rawText.replace(CODE_FENCE_REGEX, '').trim();
+    const cleaned = rawText.replace(/```json|```/gi, '').trim();
 
     try {
       const parsed = JSON.parse(cleaned);
       return JSON.stringify(parsed, null, 2);
-    } catch (error) {
-      throw new HttpError(500, 'Anthropic response was not valid JSON-LD.', error.message);
+    } catch (err) {
+      throw new HttpError(500, 'Anthropic response was not valid JSON-LD.', err.message);
     }
   }
 }
 
 function arrayOrPlaceholder(values) {
-  if (!values || values.length === 0) {
-    return 'None detected';
-  }
-
+  if (!values || values.length === 0) return 'None detected';
   return values.join(', ');
-}
-
-function optionsApiKey(explicit, envValue) {
-  if (explicit && explicit.trim().length > 0) {
-    return explicit.trim();
-  }
-
-  if (envValue && envValue.trim().length > 0) {
-    return envValue.trim();
-  }
-
-  return '';
 }
 
 module.exports = { AnthropicClient };
