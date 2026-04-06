@@ -97,11 +97,8 @@
       </section>
     </main>
 
-    <script>
-      window.LLM_OPTIMIZER_CONFIG = {
-        basePath: '<%= resolvedBasePath %>',
-      };
+    <script src="<%= assetsBasePath %>/js/app.js" defer
+      data-base-path="<%= resolvedBasePath %>">
     </script>
-    <script src="<%= assetsBasePath %>/js/app.js" defer></script>
   </body>
 </html>

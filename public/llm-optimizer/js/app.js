@@ -1,6 +1,6 @@
 (() => {
-  const basePath =
-    (window.LLM_OPTIMIZER_CONFIG && window.LLM_OPTIMIZER_CONFIG.basePath) || '';
+  const _scriptEl = document.currentScript || document.querySelector('script[data-base-path]');
+  const basePath = (_scriptEl && _scriptEl.dataset.basePath) || '';
   const apiBase = `${basePath}/api`;
   const form = document.getElementById('analyzeForm');
   const urlInput = document.getElementById('url');
@@ -21,6 +21,12 @@
 
   const defaultStatus = statusCard ? statusCard.innerHTML : '';
   let generatedMarkup = '';
+
+  // Pre-fill URL from query string (e.g. when linked from audit results)
+  const prefilledUrl = new URLSearchParams(window.location.search).get('url');
+  if (prefilledUrl && urlInput) {
+    urlInput.value = prefilledUrl;
+  }
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();

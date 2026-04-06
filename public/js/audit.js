@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('auditBtn').addEventListener('click', startAudit);
     document.getElementById('exportBtn').addEventListener('click', exportResults);
+    document.getElementById('exportPdfBtn').addEventListener('click', exportPdf);
     document.getElementById('newAuditBtn').addEventListener('click', runNewAudit);
 
     var llmOptimizerBtn = document.getElementById('llmOptimizerBtn');
@@ -280,6 +281,9 @@ function displayAuditResults() {
         sectionsContainer.appendChild(sectionDiv);
     });
     
+    // LLM Optimizer CTA — show when structured data is weak
+    renderLlmOptimizerCta();
+
     // Generate recommendations
     generateRecommendations();
     
@@ -295,6 +299,33 @@ function displayAuditResults() {
         resultsEl.style.transform = 'translateY(0)';
         resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
+}
+
+// LLM Optimizer CTA
+function renderLlmOptimizerCta() {
+    // Remove any existing CTA
+    const existing = document.getElementById('llmOptimizerCta');
+    if (existing) existing.remove();
+
+    const structuredDataSection = auditData.sections && auditData.sections.structuredData;
+    const structuredDataScore = structuredDataSection ? structuredDataSection.score : 100;
+    const hasWeakStructuredData = structuredDataScore !== 'N/A' && structuredDataScore < 70;
+
+    if (!hasWeakStructuredData) return;
+
+    const auditorUrl = auditData.url || '';
+    const optimizerUrl = '/llm-optimizer' + (auditorUrl ? '?url=' + encodeURIComponent(auditorUrl) : '');
+
+    const cta = document.createElement('div');
+    cta.id = 'llmOptimizerCta';
+    cta.className = 'llm-optimizer-cta';
+    cta.innerHTML = `
+        <p><strong>Missing structured data detected.</strong> Use LLM Optimizer to auto-generate Schema.org markup for this page.</p>
+        <a href="${optimizerUrl}" class="cta-btn">Generate Schema Markup →</a>
+    `;
+
+    const sectionsContainer = document.getElementById('auditSections');
+    sectionsContainer.after(cta);
 }
 
 // Generate recommendations
@@ -458,6 +489,14 @@ function exportResults() {
     
     // Show success message
     showNotification('Report exported successfully!', 'success');
+}
+
+function exportPdf() {
+    if (!auditData || !auditData.url) {
+        alert('No audit results to export');
+        return;
+    }
+    window.print();
 }
 
 // Show notification
