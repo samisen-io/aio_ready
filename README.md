@@ -116,3 +116,21 @@ This project is licensed under the MIT License.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests. 
+## Engineering notes
+
+- **Shape:** a small Express service instead of a framework — one analysed endpoint (`POST /api/audit`)
+  behind a rate limiter, static pages, and `/api/health`.
+- **What it checks:** how AI answer engines and crawlers read a page. The checker list includes
+  GPTBot, ClaudeBot, PerplexityBot, GoogleExtended, Applebot-Extended, anthropic-ai and CCBot.
+- **LLM access is isolated** in `services/llmOptimizer/anthropicClient.js`, so the audit prompt can
+  change without touching routing.
+- **Tests:** Jest, with separate `npm run test:unit` and `test:integration` scripts
+  (`tests/unit/analyzers.test.js` covers the analysers).
+
+## Limitations and next steps
+
+- The audit prompt has no evaluation harness — a golden set of URLs with expected findings is the
+  next thing this repo needs.
+- Single-page audits only; a crawl mode, and a CI mode that fails a build when a site regresses,
+  are the natural extensions.
+- No caching between identical audits; a short-TTL store would cut cost and latency.
